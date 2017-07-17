@@ -1,0 +1,255 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+	<meta charset="UTF-8" />
+	<title>Phaser - Making your first game, part 1</title>
+	<script type="text/javascript" src="js/phaser.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+var cursors;
+var player;
+var platforms;
+var stars;
+var enemies;
+var portals;
+var fixedStar;
+var starCount = 0;
+var scoreText;
+var winText;
+var deathText;
+var title;
+var titleText;
+var space;
+var music;
+var notEnough;
+var yaboi;
+var xfile;
+
+function preload() {
+    game.load.spritesheet('player', 'assets/dude.png', 32, 48);
+    game.load.image('sky', 'assets/sky.png');
+    game.load.image('platform', 'assets/wall.png');
+    game.load.image('star', 'assets/star.png');
+    game.load.image('enemy', 'assets/lava.png');
+    game.load.image('portal', 'assets/portalBlock2.png');
+    game.load.image('title', 'assets/titleScreen.png');
+    game.load.image('space', 'assets/starfield.png');
+    
+    game.load.audio('digibit', 'assets/audio/DJMatrix - Digibit Adventures.mp3', 'assets/audio/DJMatrix - Digibit Adventures.ogg');
+    game.load.audio('yeaBoi', 'assets/audio/yeaBoii.mp3', 'assets/audio/yeaBoii.ogg');
+    game.load.audio('luminarty', 'assets/audio/X-Files Theme Full (Illuminati Song).mp3');
+
+}
+
+function create() {
+    
+    //start physics engine (ARCADE)
+    game.physics.startSystem(Phaser.Physics.ARCADE);
+    
+    game.world.enableBody = true;
+    
+    //music
+    music = game.add.audio('digibit');
+    yaboi = game.add.audio('yeaBoi');
+    xfile = game.add.audio('luminarty');
+    
+    xfile.play();
+    
+    //space
+    space = game.add.tileSprite(0, 0, 800, 600, 'space');
+    space.fixedToCamera = true;
+    
+    //controls
+    cursors = game.input.keyboard.createCursorKeys();
+    
+    //player
+    player = game.add.sprite(70, 100, 'player');
+    game.physics.arcade.enable(player);
+    
+    player.body.gravity.y = 600;
+    
+    player.animations.add('left', [0, 1, 2, 3], 10, true);
+    player.animations.add('right', [5, 6, 7, 8], 10, true);
+    
+    //group creation
+    platforms = game.add.group();
+    stars = game.add.group();
+    enemies = game.add.group();
+    portals = game.add.group();
+    
+    //create level x = wall, o = star, ! = lava
+    var level = [
+        'xxxxxxxxxxxxxxxxxxxxxx',
+        'x         x          x            o    ',
+        'x                    x               !x',
+        'x                 o          x       !x',
+        'x         o                  xx      !x',
+        'x                            x       !x',
+        'x                    xxxxxxxxx       !x',
+        'x     o   x    x     x             xxxx',
+        'xxxxxxxxxxxxxxxx!!!!!x            xx',
+        'x                                  x',
+        'x oo                         x x   x',
+        'x oo                 o             x',
+        'x oo                               x',
+        'x oo        xx       xx            x',
+        'x                    xx            x',
+        'xxxxx!!!!!!!!!!!!!!xxxx    x!!!!!xxx',
+        'x   !               !      x',
+        'x                      x   x',
+        'x           !              x',
+        'x p      o          o      x',
+        'x                         xx',
+        'x                          x',
+        'x    !              !      x',
+        'xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        
+    ];
+    
+    for (var i = 0; i < level.length; i++) {
+        for (var j = 0; j < level[i].length; j++) {
+            
+            //create platforms
+            if (level[i][j] == 'x') {
+                var wall = game.add.sprite(30+20*j, 30+20*i, 'platform');
+                platforms.add(wall);
+                wall.body.immovable = true;
+            }
+            
+            //create stars
+            else if (level[i][j] == 'o') {
+                var star = game.add.sprite(30+20*j, 30+20*i, 'star');
+                stars.add(star);
+            }
+            
+            //create enemies
+            else if (level[i][j] == '!') {
+                var enemy = game.add.sprite(30+20*j, 30+20*i, 'enemy');
+                enemies.add(enemy);
+            }
+            
+            //create portals
+            else if (level[i][j] == 'p') {
+                var portal = game.add.sprite(30+20*j, 30+20*i, 'portal');
+                portals.add(portal);
+            }
+        }
+    }
+    
+    //fixed star score
+    fixedStar = game.add.sprite(20, 29, 'star');
+    fixedStar.scale.setTo(2, 2);
+    fixedStar.fixedToCamera = true;
+    
+    //star text
+    scoreText = game.add.text(80, 37, 'x  0', { fontSize: '32px', fill: '#fff' });
+    scoreText.fixedToCamera = true;
+    
+    //make world bigger than camera
+    game.world.setBounds(0, 0, 1920, 1920);
+    game.camera.follow(player);
+    
+    //title screen
+    title = game.add.sprite(0, 0, 'title');
+    title.fixedToCamera = true;
+    
+    titleText = game.add.text(260, 200, '            PLACE \n \n        Click to begin \n \n \n Created by MatrixStudios', { fontSize: '64 px', fill: '#666'});
+    game.input.onTap.addOnce(start, this);
+    
+}
+
+function update() {
+    
+    game.physics.arcade.collide(player, platforms);
+    
+    game.physics.arcade.overlap(player, stars, getStar, null, this);
+    game.physics.arcade.overlap(player, enemies, death, null, this);
+    game.physics.arcade.overlap(player, portals, nextLevel, null, this);
+    
+    player.body.velocity.x = 0;
+    
+    //scrolling background
+    space.tilePosition.y += 2;
+    
+    //player movement
+    if (cursors.left.isDown) {
+        player.body.velocity.x = -200;
+        
+        player.animations.play('left');
+    }
+    
+    else if (cursors.right.isDown) {
+        player.body.velocity.x = 200;
+        
+        player.animations.play('right');
+    }
+    
+    else {
+        player.animations.stop();
+        
+        player.frame = 4;
+    }
+    
+    if (cursors.up.isDown && player.body.touching.down) {
+        player.body.velocity.y = -300;
+    }
+    
+    
+    
+}
+
+function getStar(player, star) {
+    star.kill();
+    
+    starCount++;
+    scoreText.text = "x  " + starCount;
+}
+
+function death(player, enemies) {
+    player.kill();
+    
+    deathText = game.add.text(300, 200, '       You Lose \n ctrl+r to restart', { fontSize: '64 px', fill: '#666'});
+    deathText.fixedToCamera = true;
+}
+
+function nextLevel(player, portals) {
+    
+    if (starCount == 15) {
+        player.kill();
+    
+        winText = game.add.text(300, 200, '              You Win! \n New levels coming soon \n          ctrl+r to restart', { fontSize: '64 px', fill: '#666'});
+        winText.fixedToCamera = true;
+        
+        music.pause();
+        yaboi.play();
+        //notEnough.visible = false;
+    }
+    
+    else {
+        notEnough = game.add.text(430, 16, 'You dont have enough stars!', { fontSize: '64 px', fill: '#fff' });
+        notEnough.visible = true;
+        notEnough.fixedToCamera = true;
+    }
+}
+
+function start() {
+    title.visible = false;
+    titleText.visible = false;
+    
+    xfile.pause();
+    music.play();
+}
+
+</script>
+
+</body>
+</html>
